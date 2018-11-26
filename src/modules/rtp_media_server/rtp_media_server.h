@@ -65,6 +65,7 @@ typedef enum rms_action_type
 	RMS_STOP,
 	RMS_HANGUP,
 	RMS_PLAY,
+	RMS_BRIDGE,
 	RMS_DONE,
 } rms_action_type_t;
 
@@ -85,6 +86,7 @@ typedef struct rms_session_info
 	rms_sdp_info_t sdp_info_answer;
 	str callid;
 	str local_ip;
+	int local_port;
 	str local_uri;
 	str local_tag;
 	str remote_uri;
@@ -92,8 +94,7 @@ typedef struct rms_session_info
 	str contact_uri;
 	int cseq;
 	ms_res_t ms;
-	call_leg_media_t caller_media;
-	call_leg_media_t callee_media;
+	call_leg_media_t media;
 	rms_action_t action;
 } rms_session_info_t;
 

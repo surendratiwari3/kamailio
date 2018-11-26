@@ -242,7 +242,7 @@ inline static struct dest_info *uri2dst2(struct dest_info* dst,
 #endif
 
 	if (parse_uri(uri->s, uri->len, &parsed_uri) < 0) {
-		LM_ERR("bad_uri: [%.*s]\n", uri->len, uri->s );
+		LM_ERR("bad_uri !: [%.*s]\n", uri->len, uri->s );
 		return 0;
 	}
 

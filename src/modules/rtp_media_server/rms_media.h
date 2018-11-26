@@ -58,7 +58,7 @@ typedef struct call_leg_media
 	int local_port;
 	str remote_ip;
 	int remote_port;
-	struct rms_session_info *si;
+	const struct rms_session_info *si;
 } call_leg_media_t;
 
 int create_call_leg_media(call_leg_media_t *m);
