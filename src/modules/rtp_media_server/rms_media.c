@@ -132,7 +132,7 @@ int rms_bridge(call_leg_media_t *m1, call_leg_media_t *m2)
 {
 	MSConnectionHelper h;
 	m1->ms_ticker = rms_create_ticker(NULL);
-
+	LM_NOTICE("[%p][%p][%p][%p]\n", m1->ms_rtprecv, m1->ms_rtpsend, m2->ms_rtprecv, m2->ms_rtprecv);
 	// direction 1
 	ms_connection_helper_start(&h);
 	ms_connection_helper_link(&h, m1->ms_rtprecv, -1, 0);

@@ -99,7 +99,7 @@ int rms_sdp_prepare_new_body(rms_sdp_info_t *sdp_info, int payload_type_number)
 			payload_type_number);
 	body->len += strlen(sdp_m);
 
-	body->s = pkg_malloc(body->len + 1);
+	body->s = shm_malloc(body->len + 1);
 	if (!body->s) return 0;
 	strcpy(body->s, sdp_v);
 	strcat(body->s, sdp_o);

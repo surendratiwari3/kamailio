@@ -69,6 +69,8 @@ typedef enum rms_action_type
 	RMS_DONE,
 } rms_action_type_t;
 
+typedef struct rms_session_info rms_session_info_t;
+
 typedef struct rms_action
 {
 	struct rms_action *next;
@@ -77,6 +79,7 @@ typedef struct rms_action
 	str route;
 	rms_action_type_t type;
 	struct cell *cell;
+	rms_session_info_t *si;
 } rms_action_t;
 
 typedef struct rms_session_info
@@ -97,6 +100,7 @@ typedef struct rms_session_info
 	ms_res_t ms;
 	call_leg_media_t media;
 	rms_action_t action;
+	rms_session_info_t *bridged_si;
 } rms_session_info_t;
 
 #endif
