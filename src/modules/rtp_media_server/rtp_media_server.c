@@ -402,6 +402,17 @@ static int rms_answer_call(struct sip_msg *msg, rms_session_info_t *si)
 	return 1;
 }
 
+static void bridge_cb(struct cell *ptrans, int ntype, struct tmcb_params *pcbp)
+{
+	if (ntype == TMCB_ON_FAILURE)
+		LM_NOTICE("FAILURE [%d]\n", pcbp->code);
+	else
+		LM_NOTICE("COMPLETE [%d]\n", pcbp->code);
+	rms_action_t *a = (rms_action_t *) *pcbp->param;
+	str reason = str_init("OK");
+	tmb.t_reply_with_body(a->cell, 200, &reason, NULL, NULL, NULL);
+}
+
 static int rms_bridge_call(rms_session_info_t *si, rms_action_t *a)
 {
 	uac_req_t uac_r;
@@ -450,7 +461,7 @@ static int rms_bridge_call(rms_session_info_t *si, rms_action_t *a)
 	dialog->rem_target.s = param_uri->s;
 	dialog->rem_target.len = param_uri->len - 1;
 	set_uac_req(&uac_r, &method_invite, &headers, NULL, dialog,
-			TMCB_LOCAL_COMPLETED, NULL, NULL);
+			TMCB_LOCAL_COMPLETED|TMCB_ON_FAILURE, bridge_cb, a);
 	result = tmb.t_request_within(&uac_r);
 	if(result < 0) {
 		LM_ERR("error in tmb.t_request\n");
@@ -871,6 +882,7 @@ static int rms_bridge_f(struct sip_msg *msg, str *target, str *route)
 			goto error;
 		}
 	}
+	tmb.t_reply(msg, 100, "Trying");
 	si->local_port = msg->rcv.dst_port;
 	rms_action_t *a = rms_action_new(RMS_BRIDGE);
 	if(!a) return -1;
@@ -880,6 +892,7 @@ static int rms_bridge_f(struct sip_msg *msg, str *target, str *route)
 	a->param.s = target->s;
 	a->route.len = route->len;
 	a->route.s = route->s;
+	a->cell = tmb.t_gett();
 	rms_action_add(si, a);
 	rms_session_add(si);
 	return 0;

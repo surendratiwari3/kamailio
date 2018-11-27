@@ -76,6 +76,7 @@ typedef struct rms_action
 	str param;
 	str route;
 	rms_action_type_t type;
+	struct cell *cell;
 } rms_action_t;
 
 typedef struct rms_session_info
