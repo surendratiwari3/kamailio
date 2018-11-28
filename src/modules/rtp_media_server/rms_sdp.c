@@ -22,6 +22,7 @@
 #include "rms_util.h"
 #include "../../core/data_lump.h"
 #include "../../core/parser/parse_content.h"
+#include "../../core/parser/sdp/sdp.h"
 
 // https://tools.ietf.org/html/rfc4566
 // (protocol version)
@@ -36,6 +37,64 @@ const char *sdp_t = "t=0 0\r\n";
 //"a=rtpmap:8 PCMA/8000\r\n"
 //"a=rtpmap:96 opus/48000/2\r\n"
 //"a=fmtp:96 useinbandfec=1\r\n";
+
+int rms_get_sdp_info(rms_sdp_info_t *sdp_info, struct sip_msg *msg)
+{
+	sdp_session_cell_t *sdp_session;
+	sdp_stream_cell_t *sdp_stream;
+	str media_ip, media_port;
+	int sdp_session_num = 0;
+	int sdp_stream_num = get_sdp_stream_num(msg);
+	if(parse_sdp(msg) < 0) {
+		LM_INFO("can not parse sdp\n");
+		return 0;
+	}
+	sdp_info_t *sdp = (sdp_info_t *)msg->body;
+	if(!sdp) {
+		LM_INFO("sdp null\n");
+		return 0;
+	}
+	rms_str_dup(&sdp_info->recv_body, &sdp->text, 1);
+	if(!sdp_info->recv_body.s)
+		goto error;
+	LM_INFO("sdp body - type[%d]\n", sdp->type);
+	if(sdp_stream_num > 1 || !sdp_stream_num) {
+		LM_INFO("only support one stream[%d]\n", sdp_stream_num);
+	}
+	sdp_stream_num = 0;
+	sdp_session = get_sdp_session(msg, sdp_session_num);
+	if(!sdp_session) {
+		return 0;
+	} else {
+		int sdp_stream_num = 0;
+		sdp_stream = get_sdp_stream(msg, sdp_session_num, sdp_stream_num);
+		if(!sdp_stream) {
+			LM_INFO("can not get the sdp stream\n");
+			return 0;
+		} else {
+			rms_str_dup(&sdp_info->payloads, &sdp_stream->payloads, 1);
+			if(!sdp_info->payloads.s)
+				goto error;
+		}
+	}
+	if(sdp_stream->ip_addr.s && sdp_stream->ip_addr.len > 0) {
+		media_ip = sdp_stream->ip_addr;
+	} else {
+		media_ip = sdp_session->ip_addr;
+	}
+	rms_str_dup(&sdp_info->remote_ip, &media_ip, 1);
+	if(!sdp_info->remote_ip.s)
+		goto error;
+	rms_str_dup(&media_port, &sdp_stream->port, 0);
+	if(!media_port.s)
+		goto error;
+	sdp_info->remote_port = atoi(media_port.s);
+	pkg_free(media_port.s);
+	return 1;
+error:
+	rms_sdp_info_free(sdp_info);
+	return 0;
+}
 
 static char *rms_sdp_get_rtpmap(str body, int type_number)
 {
