@@ -52,8 +52,8 @@ typedef struct rms_action
 int rms_check_msg(struct sip_msg *msg);
 rms_action_t *rms_action_new(rms_action_type_t t);
 int init_rms_session_list();
-rms_session_info_t *rms_session_search(char *callid, int len);
-rms_session_info_t *rms_session_search_sync(char *callid, int len);
+rms_session_info_t *rms_session_search(struct sip_msg *msg);
+rms_session_info_t *rms_session_search_sync(struct sip_msg *msg);
 void rms_session_add(rms_session_info_t *si);
 void rms_session_rm(rms_session_info_t *si);
 int rms_session_free(rms_session_info_t *si);

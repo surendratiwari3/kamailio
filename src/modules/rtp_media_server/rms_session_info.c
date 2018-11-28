@@ -19,8 +19,14 @@
  */
 
 #include "rtp_media_server.h"
-
-
+/*
+static str * get_from_tag(struct sip_msg *msg)
+{
+	struct to_body *from = get_from(msg);
+	if (!from) return NULL;
+	return from->tag_value;
+}
+*/
 static rms_session_info_t *rms_session_list;
 
 static void rms_action_free(rms_session_info_t *si)
@@ -50,22 +56,23 @@ int init_rms_session_list()
 	return 1;
 }
 
-rms_session_info_t *rms_session_search(char *callid, int len)
+rms_session_info_t *rms_session_search(struct sip_msg *msg) // str *from_tag)
 {
 	rms_session_info_t *si;
+	str callid =  msg->callid->body;
 	clist_foreach(rms_session_list, si, next)
 	{
-		if(strncmp(callid, si->callid.s, len) == 0) {
+		if(strncmp(callid.s, si->callid.s, callid.len) == 0) {
 			return si;
 		}
 	}
 	return NULL;
 }
 
-rms_session_info_t *rms_session_search_sync(char *callid, int len)
+rms_session_info_t *rms_session_search_sync(struct sip_msg *msg)
 {
 	lock(&session_list_mutex);
-	rms_session_info_t *si = rms_session_search(callid, len);
+	rms_session_info_t *si = rms_session_search(msg);
 	unlock(&session_list_mutex);
 	return si;
 }
@@ -122,7 +129,7 @@ int rms_check_msg(struct sip_msg *msg)
 		LM_INFO("no callid ?\n");
 		return -1;
 	}
-	if(rms_session_search(msg->callid->body.s, msg->callid->body.len))
+	if(rms_session_search(msg))
 		return -1;
 	return 1;
 }

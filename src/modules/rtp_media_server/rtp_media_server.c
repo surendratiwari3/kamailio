@@ -334,7 +334,7 @@ static int rms_answer_call(struct cell *cell, rms_session_info_t *si, rms_sdp_in
 //		LM_INFO("no callid ?\n");
 //		return -1;
 //	}
-//	si = rms_session_search_sync(msg->callid->body.s, msg->callid->body.len);
+//	si = rms_session_search_sync(msg);
 //	if(!si) {
 //		LM_INFO("session not found ci[%.*s]\n", msg->callid->body.len,
 //				msg->callid->body.s);
@@ -617,7 +617,7 @@ static int rms_media_stop_f(struct sip_msg *msg, char *param1, char *param2)
 		LM_ERR("no callid\n");
 		return -1;
 	}
-	si = rms_session_search_sync(msg->callid->body.s, msg->callid->body.len);
+	si = rms_session_search_sync(msg);
 	if(!si) {
 		LM_INFO("session not found ci[%.*s]\n", msg->callid->body.len,
 				msg->callid->body.s);
@@ -637,7 +637,7 @@ static int rms_media_stop_f(struct sip_msg *msg, char *param1, char *param2)
 
 //static int rms_action_dtmf_f(struct sip_msg *msg, char dtmf, str *route)
 //	rms_session_info_t *si =
-//			rms_session_search(msg->callid->body.s, msg->callid->body.len);
+//			rms_session_search(msg);
 //	if(!si)
 //		return -1;
 //	rms_playfile();
@@ -646,8 +646,7 @@ static int rms_media_stop_f(struct sip_msg *msg, char *param1, char *param2)
 
 static int rms_action_play_f(struct sip_msg *msg, str *playback_fn, str *route)
 {
-	rms_session_info_t *si =
-			rms_session_search(msg->callid->body.s, msg->callid->body.len);
+	rms_session_info_t *si = rms_session_search(msg);
 	if(!si)
 		return -1;
 	LM_INFO("RTP session [%s:%d]<>[%s:%d]\n", si->media.local_ip.s,
@@ -670,8 +669,7 @@ static int rms_bridge_f(struct sip_msg *msg, str *target, str *route)
 	if(status<1) return status;
 	if(!rms_check_msg(msg))
 		return -1;
-	rms_session_info_t *si =
-			rms_session_search(msg->callid->body.s, msg->callid->body.len);
+	rms_session_info_t *si = rms_session_search(msg);
 	if(si) { // bridge an existing session, another command/context ??
 		return 1;
 	} else {
@@ -718,7 +716,7 @@ static int rms_answer_f(struct sip_msg *msg)
 	int status = rms_create_trans(msg);
 	if(status<1) return status;
 
-	if(rms_session_search(msg->callid->body.s, msg->callid->body.len))
+	if(rms_session_search(msg))
 		return -1;
 	rms_session_info_t *si = rms_session_new(msg);
 	if(!si)
@@ -756,8 +754,7 @@ error:
 
 static int rms_hangup_f(struct sip_msg *msg)
 {
-	rms_session_info_t *si =
-			rms_session_search(msg->callid->body.s, msg->callid->body.len);
+	rms_session_info_t *si = rms_session_search(msg);
 	if(!si)
 		return -1;
 	rms_action_t *a = rms_action_new(RMS_HANGUP);
