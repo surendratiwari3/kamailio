@@ -26,7 +26,6 @@ MODULE_VERSION
 static int mod_init(void);
 static void mod_destroy(void);
 static int child_init(int);
-static rms_session_info_t *rms_session_list;
 str playback_fn = {0, 0};
 str log_fn = {0, 0};
 
@@ -236,6 +235,7 @@ static void rms_session_manage_loop()
 {
 	while(1) {
 		lock(&session_list_mutex);
+		rms_session_info_t *rms_session_list = rms_get_session_list();
 		rms_session_info_t *si;
 		clist_foreach(rms_session_list, si, next)
 		{

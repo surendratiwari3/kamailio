@@ -29,6 +29,10 @@ static str * get_from_tag(struct sip_msg *msg)
 */
 static rms_session_info_t *rms_session_list;
 
+rms_session_info_t *rms_get_session_list(void){
+	return rms_session_list;
+}
+
 static void rms_action_free(rms_session_info_t *si)
 {
 	rms_action_t *a, *tmp;
