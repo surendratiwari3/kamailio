@@ -105,6 +105,14 @@ static void run_action_route(rms_session_info_t *si, char *route)
 		from_parsed.tag_value.s = si->remote_tag.s;
 		fmsg->from = &from;
 	}
+	//{ // set the to tag
+	//	struct hdr_field to;
+	//	struct to_body to_parsed;
+	//	to.parsed = &to_parsed;
+	//	to_parsed.tag_value.len = si->local_tag.len;
+	//	to_parsed.tag_value.s = si->local_tag.s;
+	//	fmsg->to = &to;
+	//}
 
 	backup_rt = get_route_type();
 	set_route_type(EVENT_ROUTE);
@@ -205,8 +213,8 @@ static rms_session_info_t* rms_session_action_check(rms_session_info_t *si)
 		if(a->type == RMS_HANGUP) {
 			LM_INFO("session action RMS_HANGUP [%s]\n", si->callid.s);
 			rms_hangup_call(si);
-			//if (si->bridged_si)
-			//	rms_hangup_call(si->bridged_si);
+			if (si->bridged_si)
+				rms_hangup_call(si->bridged_si);
 			a->type = RMS_STOP;
 			return si;
 		} else if(a->type == RMS_BRIDGE) {
@@ -381,10 +389,10 @@ static void bridge_cb(struct cell *ptrans, int ntype, struct tmcb_params *pcbp)
 	rms_action_t *a = (rms_action_t *) *pcbp->param;
 	rms_session_info_t *bridged_si = a->si;
 
-
 	rms_session_info_t *si = rms_session_new(pcbp->rpl);
 	si->bridged_si = bridged_si;
 	bridged_si->bridged_si = si;
+	// rms_session_add(bridged_si);
 
 	rms_sdp_info_t *sdp_info = &si->sdp_info_answer;
 	if(!rms_get_sdp_info(sdp_info, pcbp->rpl)) {
