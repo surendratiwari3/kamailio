@@ -23,6 +23,7 @@
 
 MODULE_VERSION
 
+rms_session_info_t *rms_session_list;
 static int mod_init(void);
 static void mod_destroy(void);
 static int child_init(int);
@@ -62,8 +63,8 @@ static param_export_t mod_params[] = {
 		{"log_file_name", PARAM_STR, &log_fn}, {0, 0, 0}};
 
 struct module_exports exports = {
-		"rtp_media_server", DEFAULT_DLFLAGS, /* dlopen flags */
-		cmds, mod_params, 0,				 /* RPC export */
+		"rtp_media_server", DEFAULT_DLFLAGS,	/* dlopen flags */
+		cmds, mod_params, 0,			/* RPC export */
 		0, 0, mod_init, child_init, mod_destroy,
 };
 
@@ -87,12 +88,23 @@ static void run_action_route(rms_session_info_t *si, char *route)
 		LM_ERR("faked_msg_init() failed\n");
 		return;
 	}
-	fmsg = faked_msg_next();
-	struct hdr_field callid;
-	callid.body.s = si->callid.s;
-	callid.body.len = si->callid.len;
 
-	fmsg->callid = &callid;
+	fmsg = faked_msg_next();
+
+	{ // set the callid
+		struct hdr_field callid;
+		callid.body.s = si->callid.s;
+		callid.body.len = si->callid.len;
+		fmsg->callid = &callid;
+	}
+	{ // set the from tag
+		struct hdr_field from;
+		struct to_body from_parsed;
+		from.parsed = &from_parsed;
+		from_parsed.tag_value.len = si->remote_tag.len;
+		from_parsed.tag_value.s = si->remote_tag.s;
+		fmsg->from = &from;
+	}
 
 	backup_rt = get_route_type();
 	set_route_type(EVENT_ROUTE);
@@ -102,6 +114,7 @@ static void run_action_route(rms_session_info_t *si, char *route)
 	}
 	set_route_type(backup_rt);
 }
+
 
 static int fixup_rms_bridge(void **param, int param_no)
 {
@@ -174,6 +187,16 @@ void rms_signal_handler(int signum)
 	LM_INFO("signal received [%d]\n", signum);
 }
 
+
+static rms_session_info_t * rms_stop(rms_session_info_t *si) {
+	rms_stop_media(&si->media);
+	rms_session_info_t *tmp = si->prev;
+	clist_rm(si, next, prev);
+	rms_session_free(si);
+	si = tmp;
+	return si;
+}
+
 static rms_session_info_t* rms_session_action_check(rms_session_info_t *si)
 {
 	rms_action_t *a;
@@ -182,6 +205,8 @@ static rms_session_info_t* rms_session_action_check(rms_session_info_t *si)
 		if(a->type == RMS_HANGUP) {
 			LM_INFO("session action RMS_HANGUP [%s]\n", si->callid.s);
 			rms_hangup_call(si);
+			//if (si->bridged_si)
+			//	rms_hangup_call(si->bridged_si);
 			a->type = RMS_STOP;
 			return si;
 		} else if(a->type == RMS_BRIDGE) {
@@ -191,11 +216,9 @@ static rms_session_info_t* rms_session_action_check(rms_session_info_t *si)
 			return si;
 		} else if(a->type == RMS_STOP) {
 			LM_INFO("session action RMS_STOP [%s][%p|%p]\n", si->callid.s, si, si->prev);
-			rms_stop_media(&si->media);
-			rms_session_info_t *tmp = si->prev;
-			clist_rm(si, next, prev);
-			rms_session_free(si);
-			si = tmp;
+			//if (si->bridged_si)
+			//	rms_stop(si->bridged_si);
+			si = rms_stop(si);
 			return si;
 		} else if(a->type == RMS_PLAY) {
 			LM_INFO("session action RMS_PLAY [%s]\n", si->callid.s);
@@ -235,14 +258,13 @@ static void rms_session_manage_loop()
 {
 	while(1) {
 		lock(&session_list_mutex);
-		rms_session_info_t *rms_session_list = rms_get_session_list();
 		rms_session_info_t *si;
 		clist_foreach(rms_session_list, si, next)
 		{
 			si = rms_session_action_check(si);
 		}
 		unlock(&session_list_mutex);
-		usleep(2000);
+		usleep(1000000);
 	}
 }
 
@@ -275,17 +297,6 @@ static int child_init(int rank)
 	int rtn = 0;
 	return (rtn);
 }
-
-
-
-//static int rms_relay_call(struct sip_msg *msg)
-//{
-//	if(!tmb.t_relay(msg, NULL, NULL)) {
-//		LM_INFO("t_ralay error\n");
-//		return -1;
-//	}
-//	return 1;
-//}
 
 static int parse_from(struct sip_msg *msg, rms_session_info_t *si)
 {
@@ -492,7 +503,9 @@ static int rms_hangup_call(rms_session_info_t *si)
 
 
 
-// Create a new session info that will be used for bridging
+/*
+ * Create a new session info that will be used for bridging
+ */
 static rms_session_info_t *rms_session_create_leg(rms_session_info_t *si)
 {
 	if(!si) return NULL;
@@ -580,9 +593,6 @@ static void rms_action_add_sync(rms_session_info_t *si, rms_action_t *a) {
 	unlock(&session_list_mutex);
 }
 
-
-
-
 //static int rms_sdp_offer_f(struct sip_msg *msg, char *param1, char *param2)
 //{
 //	int status = rms_create_trans(msg);
@@ -647,8 +657,9 @@ static int rms_media_stop_f(struct sip_msg *msg, char *param1, char *param2)
 static int rms_action_play_f(struct sip_msg *msg, str *playback_fn, str *route)
 {
 	rms_session_info_t *si = rms_session_search(msg);
-	if(!si)
+	if(!si) {
 		return -1;
+	}
 	LM_INFO("RTP session [%s:%d]<>[%s:%d]\n", si->media.local_ip.s,
 			si->media.local_port, si->media.remote_ip.s,
 			si->media.remote_port);

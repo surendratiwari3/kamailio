@@ -19,19 +19,8 @@
  */
 
 #include "rtp_media_server.h"
-/*
-static str * get_from_tag(struct sip_msg *msg)
-{
-	struct to_body *from = get_from(msg);
-	if (!from) return NULL;
-	return from->tag_value;
-}
-*/
-static rms_session_info_t *rms_session_list;
+extern rms_session_info_t *rms_session_list;
 
-rms_session_info_t *rms_get_session_list(void){
-	return rms_session_list;
-}
 
 static void rms_action_free(rms_session_info_t *si)
 {
@@ -44,7 +33,6 @@ static void rms_action_free(rms_session_info_t *si)
 	}
 }
 
-
 rms_action_t *rms_action_new(rms_action_type_t t) {
 	rms_action_t *a = shm_malloc(sizeof(rms_action_t));
 	if (!a) return NULL;
@@ -52,6 +40,7 @@ rms_action_t *rms_action_new(rms_action_type_t t) {
 	a->type = t;
 	return a;
 }
+
 int init_rms_session_list()
 {
 	rms_session_list = shm_malloc(sizeof(rms_session_info_t));
@@ -63,11 +52,17 @@ int init_rms_session_list()
 rms_session_info_t *rms_session_search(struct sip_msg *msg) // str *from_tag)
 {
 	rms_session_info_t *si;
-	str callid =  msg->callid->body;
+	str callid = msg->callid->body;
+	if (parse_from_header(msg) < 0) {
+		LM_ERR("can not parse from header!\n");
+		return NULL;
+	}
+	struct to_body *from = get_from(msg);
 	clist_foreach(rms_session_list, si, next)
 	{
 		if(strncmp(callid.s, si->callid.s, callid.len) == 0) {
-			return si;
+			if(strncmp(from->tag_value.s, si->remote_tag.s, from->tag_value.len) == 0)
+				return si;
 		}
 	}
 	return NULL;
@@ -133,8 +128,6 @@ int rms_check_msg(struct sip_msg *msg)
 		LM_INFO("no callid ?\n");
 		return -1;
 	}
-	if(rms_session_search(msg))
-		return -1;
 	return 1;
 }
 
