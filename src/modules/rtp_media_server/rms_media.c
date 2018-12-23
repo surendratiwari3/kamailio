@@ -82,6 +82,7 @@ static MSTicker *rms_create_ticker(char *name)
 	MSTickerParams params;
 	params.name = name;
 	params.prio = MS_TICKER_PRIO_NORMAL;
+	LM_INFO("\n");
 	return ms_ticker_new_with_params(&params);
 }
 
@@ -114,7 +115,7 @@ int create_call_leg_media(call_leg_media_t *m)
 	m->ms_rtprecv = ms_factory_create_filter(m->ms_factory, MS_RTP_RECV_ID);
 	m->ms_rtpsend = ms_factory_create_filter(m->ms_factory, MS_RTP_SEND_ID);
 
-	LM_INFO("codec[%s]\n", m->pt->mime_type);
+	LM_INFO("codec[%s] rtprecv[%p] rtpsend[%p]\n", m->pt->mime_type, m->ms_rtprecv, m->ms_rtpsend);
 	m->ms_encoder = ms_factory_create_encoder(m->ms_factory, m->pt->mime_type);
 	if(!m->ms_encoder) {
 		LM_ERR("creating encoder failed.\n");
@@ -128,26 +129,6 @@ int create_call_leg_media(call_leg_media_t *m)
 	return 1;
 }
 
-int rms_bridge(call_leg_media_t *m1, call_leg_media_t *m2)
-{
-	MSConnectionHelper h;
-	m1->ms_ticker = rms_create_ticker(NULL);
-	LM_NOTICE("[%p][%p][%p][%p]\n", m1->ms_rtprecv, m1->ms_rtpsend, m2->ms_rtprecv, m2->ms_rtprecv);
-	// direction 1
-	ms_connection_helper_start(&h);
-	ms_connection_helper_link(&h, m1->ms_rtprecv, -1, 0);
-	ms_connection_helper_link(&h, m2->ms_rtpsend, 0, -1);
-
-	// direction 2
-	ms_connection_helper_start(&h);
-	ms_connection_helper_link(&h, m2->ms_rtprecv, -1, 0);
-	ms_connection_helper_link(&h, m1->ms_rtpsend, 0, -1);
-
-	ms_ticker_attach_multiple(
-			m1->ms_ticker, m1->ms_rtprecv, m2->ms_rtprecv, NULL);
-
-	return 1;
-}
 
 static void rms_player_eof(
 		void *user_data, MSFilter *f, unsigned int event, void *event_data)
@@ -159,47 +140,7 @@ static void rms_player_eof(
 	MS_UNUSED(f), MS_UNUSED(event_data);
 }
 
-int rms_stop_bridge(call_leg_media_t *m1, call_leg_media_t *m2)
-{
-	MSConnectionHelper h;
-	if(!m1->ms_ticker)
-		return -1;
-	if(m1->ms_rtpsend)
-		ms_ticker_detach(m1->ms_ticker, m1->ms_rtpsend);
-	if(m1->ms_rtprecv)
-		ms_ticker_detach(m1->ms_ticker, m1->ms_rtprecv);
-	if(m2->ms_rtpsend)
-		ms_ticker_detach(m1->ms_ticker, m2->ms_rtpsend);
-	if(m2->ms_rtprecv)
-		ms_ticker_detach(m1->ms_ticker, m2->ms_rtprecv);
-	rtp_stats_display(rtp_session_get_stats(m1->rtps),
-			" AUDIO BRIDGE offer RTP STATISTICS ");
-	rtp_stats_display(rtp_session_get_stats(m2->rtps),
-			" AUDIO BRIDGE answer RTP STATISTICS ");
-	ms_factory_log_statistics(m1->ms_factory);
 
-	ms_connection_helper_start(&h);
-	if(m1->ms_rtprecv)
-		ms_connection_helper_unlink(&h, m1->ms_rtprecv, -1, 0);
-	if(m2->ms_rtpsend)
-		ms_connection_helper_unlink(&h, m2->ms_rtpsend, 0, -1);
-
-	ms_connection_helper_start(&h);
-	if(m2->ms_rtprecv)
-		ms_connection_helper_unlink(&h, m2->ms_rtprecv, -1, 0);
-	if(m1->ms_rtpsend)
-		ms_connection_helper_unlink(&h, m1->ms_rtpsend, 0, -1);
-
-	if(m1->ms_rtpsend)
-		ms_filter_destroy(m1->ms_rtpsend);
-	if(m1->ms_rtprecv)
-		ms_filter_destroy(m1->ms_rtprecv);
-	if(m2->ms_rtpsend)
-		ms_filter_destroy(m2->ms_rtpsend);
-	if(m2->ms_rtprecv)
-		ms_filter_destroy(m2->ms_rtprecv);
-	return 1;
-}
 
 
 int rms_get_dtmf(call_leg_media_t *m, char dtmf) {
@@ -322,5 +263,99 @@ int rms_stop_media(call_leg_media_t *m)
 		ms_filter_destroy(m->ms_voidsink);
 
 	rms_media_destroy(m);
+	return 1;
+}
+
+int rms_bridge(call_leg_media_t *m1, call_leg_media_t *m2)
+{
+	MSConnectionHelper h;
+	m1->ms_ticker = rms_create_ticker(NULL);
+	LM_NOTICE("[%p][%p][%p][%p]\n", m1->ms_rtprecv, m1->ms_rtpsend, m2->ms_rtprecv, m2->ms_rtpsend);
+	// direction 1
+	ms_connection_helper_start(&h);
+	ms_connection_helper_link(&h, m1->ms_rtprecv, -1, 0);
+	ms_connection_helper_link(&h, m2->ms_rtpsend, 0, -1);
+
+	LM_NOTICE("[%p][%p][%p][%p]2\n", m1->ms_rtprecv, m1->ms_rtpsend, m2->ms_rtprecv, m2->ms_rtpsend);
+	// direction 2
+	ms_connection_helper_start(&h);
+	ms_connection_helper_link(&h, m2->ms_rtprecv, -1, 0);
+	ms_connection_helper_link(&h, m1->ms_rtpsend, 0, -1);
+
+	LM_NOTICE("attach\n");
+	ms_ticker_attach_multiple(
+			m1->ms_ticker, m1->ms_rtprecv, m2->ms_rtprecv, NULL);
+
+	LM_NOTICE("attached\n");
+	return 1;
+}
+
+int rms_stop_bridge(call_leg_media_t *m1, call_leg_media_t *m2)
+{
+	MSConnectionHelper h;
+	MSTicker *ticker = NULL;
+
+	if(m1->ms_ticker) {
+		LM_INFO("m1 ticker active\n");
+		ticker = m1->ms_ticker;
+	}
+	if(m2->ms_ticker) {
+		LM_INFO("m2 ticker active\n");
+		ticker = m2->ms_ticker;
+	}
+	if(!ticker) return -1;
+
+	if(m1->ms_rtprecv)
+		ms_ticker_detach(ticker, m1->ms_rtprecv);
+	if(m1->ms_rtpsend)
+		ms_ticker_detach(ticker, m1->ms_rtpsend);
+	if(m2->ms_rtprecv)
+		ms_ticker_detach(ticker, m2->ms_rtprecv);
+	if(m2->ms_rtpsend)
+		ms_ticker_detach(ticker, m2->ms_rtpsend);
+
+
+	ms_connection_helper_start(&h);
+	if(m1->ms_rtprecv)
+		ms_connection_helper_unlink(&h, m1->ms_rtprecv, -1, 0);
+	if(m2->ms_rtpsend)
+		ms_connection_helper_unlink(&h, m2->ms_rtpsend, 0, -1);
+
+	ms_connection_helper_start(&h);
+	if(m2->ms_rtprecv)
+		ms_connection_helper_unlink(&h, m2->ms_rtprecv, -1, 0);
+	if(m1->ms_rtpsend)
+		ms_connection_helper_unlink(&h, m1->ms_rtpsend, 0, -1);
+
+	rtp_stats_display(rtp_session_get_stats(m1->rtps),
+			" AUDIO BRIDGE offer RTP STATISTICS ");
+
+	rtp_stats_display(rtp_session_get_stats(m2->rtps),
+			" AUDIO BRIDGE answer RTP STATISTICS ");
+
+	if(m1->ms_rtpsend)
+		ms_filter_destroy(m1->ms_rtpsend);
+	LM_INFO("destroy 1\n");
+	if(m1->ms_rtprecv)
+		ms_filter_destroy(m1->ms_rtprecv);
+	LM_INFO("destroy 2\n");
+	if(m2->ms_rtpsend)
+		ms_filter_destroy(m2->ms_rtpsend);
+	LM_INFO("destroy 3\n");
+	if(m2->ms_rtprecv)
+		ms_filter_destroy(m2->ms_rtprecv);
+
+	LM_INFO("destroy [%p]\n", m1->rtps);
+	rtp_session_destroy(m1->rtps);
+	LM_INFO("destroy [%p]\n", m2->rtps);
+	rtp_session_destroy(m2->rtps);
+	ms_ticker_destroy(ticker);
+	ticker = NULL;
+	m1->ms_ticker = NULL;
+	ms_factory_log_statistics(m1->ms_factory);
+//	LM_INFO("destroy\n");
+//	rms_media_destroy(m1);
+//
+//	rms_media_destroy(m2);
 	return 1;
 }

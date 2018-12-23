@@ -34,9 +34,16 @@ typedef enum rms_action_type
 	RMS_STOP,
 	RMS_HANGUP,
 	RMS_PLAY,
-	RMS_BRIDGE,
+	RMS_BRIDGING,
+	RMS_BRIDGED,
 	RMS_DONE,
 } rms_action_type_t;
+
+typedef struct rms_tm_info
+{
+	unsigned int hash_index;
+	unsigned int label;
+} rms_tm_info_t;
 
 typedef struct rms_action
 {
@@ -45,8 +52,9 @@ typedef struct rms_action
 	str param;
 	str route;
 	rms_action_type_t type;
-	struct cell *cell;
+	rms_tm_info_t tm_info;
 	struct rms_session_info *si;
+	struct cell *cell;
 } rms_action_t;
 
 int rms_check_msg(struct sip_msg *msg);

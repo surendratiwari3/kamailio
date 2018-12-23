@@ -61,8 +61,12 @@ rms_session_info_t *rms_session_search(struct sip_msg *msg) // str *from_tag)
 	clist_foreach(rms_session_list, si, next)
 	{
 		if(strncmp(callid.s, si->callid.s, callid.len) == 0) {
-			if(strncmp(from->tag_value.s, si->remote_tag.s, from->tag_value.len) == 0)
+			//LM_NOTICE("call-id[%s]tag[%s][%s]\n", si->callid.s, si->local_tag.s, si->remote_tag.s);
+			if(si->remote_tag.s && strncmp(from->tag_value.s, si->remote_tag.s, from->tag_value.len) == 0)
 				return si;
+			if(si->local_tag.s && strncmp(from->tag_value.s, si->local_tag.s, from->tag_value.len) == 0)
+				return si;
+			//LM_NOTICE("call-id found but tag not matching ? [%s][%.*s]\n", si->callid.s, from->tag_value.len, from->tag_value.s);
 		}
 	}
 	return NULL;
@@ -178,6 +182,7 @@ rms_session_info_t *rms_session_new(struct sip_msg *msg)
 	clist_init(&si->action, next, prev);
 	return si;
 error:
+	LM_ERR("can not create session.\n");
 	rms_session_free(si);
 	return NULL;
 }
@@ -188,8 +193,8 @@ int rms_sessions_dump_f(struct sip_msg *msg, char *param1, char *param2)
 	rms_session_info_t *si;
 	clist_foreach(rms_session_list, si, next)
 	{
-		LM_INFO("[%d]callid[%s]remote_uri[%s]local_uri[%s]cseq[%d]\n", x,
-				si->callid.s, si->remote_uri.s, si->local_uri.s, si->cseq);
+		LM_INFO("[%d]callid[%s]remote_tag[%s]local_tag[%s]cseq[%d]\n", x,
+				si->callid.s, si->remote_tag.s, si->local_tag.s, si->cseq);
 		x++;
 	}
 	return 1;
