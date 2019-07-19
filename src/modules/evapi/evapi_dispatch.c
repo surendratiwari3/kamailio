@@ -584,7 +584,7 @@ void evapi_recv_notify(struct ev_loop *loop, struct ev_io *watcher, int revents)
 {
 	evapi_msg_t *emsg = NULL;
 	int rlen;
-
+	int evapi_send_count;
 	if(EV_ERROR & revents) {
 		perror("received invalid event\n");
 		return;
@@ -602,7 +602,10 @@ void evapi_recv_notify(struct ev_loop *loop, struct ev_io *watcher, int revents)
 
 	LM_DBG("received [%p] [%.*s] (%d)\n", emsg,
 			emsg->data.len, emsg->data.s, emsg->data.len);
-	evapi_dispatch_notify(emsg);
+	evapi_send_count = evapi_dispatch_notify(emsg);
+        if (evapi_send_count == 0) {
+		LM_ERR("no evapi client to send the message, failed to send message\n");
+        }
 	shm_free(emsg);
 }
 
